@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WSL Containers 解説とセットアップ手順 — Public Preview (2026)</title>
+<meta name="description" content="Docker Desktop なしで Windows から Linux コンテナを動かす WSL Containers (WSLC) の仕組み・要件・セットアップ手順・エンタープライズ統制を、Microsoft 公式パブリックプレビュー（2026-06-29 / WSL 2.9.3）を一次情報としてまとめたガイド。">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#0078d4">
+<meta property="og:type" content="article">
+<meta property="og:title" content="WSL Containers — 仕組みの解説とセットアップ手順">
+<meta property="og:description" content="WSL Containers (WSLC) の仕組み・セットアップ・エンタープライズ統制を公式情報ベースで整理。">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E📦%3C/text%3E%3C/svg%3E">
 <style>
   :root{
     --win:#0078d4; --win-dark:#005a9e; --linux:#e95420;
@@ -147,6 +155,37 @@
   footer a{color:var(--win-dark)}
   .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin:14px 0 0;align-items:center}
   .updated{font-size:13px;color:var(--muted);margin-top:18px}
+
+  /* Back-to-top */
+  #toTop{position:fixed;right:18px;bottom:18px;z-index:50;width:44px;height:44px;border-radius:50%;
+    border:1px solid rgba(255,255,255,.3);background:var(--win);color:#fff;font-size:20px;line-height:1;cursor:pointer;
+    box-shadow:var(--shadow);opacity:0;pointer-events:none;transform:translateY(8px);transition:opacity .2s,transform .2s}
+  #toTop.show{opacity:1;pointer-events:auto;transform:none}
+  #toTop:hover{background:var(--win-dark)}
+  #toTop:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+
+  /* Print / PDF */
+  @media print{
+    @page{margin:14mm}
+    body{background:#fff;color:#000;font-size:11pt;line-height:1.5}
+    header.hero{background:#fff !important;color:#000;border-bottom:2px solid var(--win);padding:0 0 10px}
+    .hero .eyebrow{color:#444}
+    .pill{background:#eef2fb !important;border-color:#cdd9ee !important;color:#003a6b !important}
+    .wrap{display:block;max-width:none;padding:0}
+    nav.toc,#toTop,.copybtn{display:none !important}
+    section{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border-color:#ccc;padding:14px 0;margin:0 0 10px}
+    .callout,.diagram,.tw,.codeblock,.mini,.reqbox .r{break-inside:avoid;page-break-inside:avoid}
+    h2,h3{break-after:avoid;page-break-after:avoid}
+    pre{background:#f4f4f4;color:#111;border:1px solid #ddd;white-space:pre-wrap;word-break:break-all;padding:12px}
+    .codeblock .label{background:#555 !important;color:#fff}
+    pre .prompt,pre .cmt{color:#555}
+    .diagram{background:#fff;color:#000;border:1px solid #bbb}
+    .diagram .layer{background:#f6f6f6 !important;border-color:#bbb !important}
+    .diagram .lh{color:#000}.diagram .ld{color:#333}
+    .conf{border:1px solid #999 !important}
+    a{color:#003a6b;text-decoration:underline}
+    footer a[href^="http"]::after{content:" — " attr(href);font-size:8.5pt;color:#666;word-break:break-all}
+  }
 </style>
 </head>
 <body>
@@ -359,29 +398,29 @@
         <li>
           <div class="st-title">現状バージョンを確認</div>
           <p>2.9.3 未満なら更新が必要です。</p>
-          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --version</pre></div>
+          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --version</pre></div>
         </li>
         <li>
           <div class="st-title">WSL を pre-release に更新</div>
           <p><code>wslc.exe</code> を含む新ビルド（2.9.3+）が入り、PATH に自動追加されます。<br><span style="font-size:13.5px;color:var(--muted)">※ この更新コマンド自体は実行中の WSL を止めません（インストールのみ）。</span></p>
-          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --update --pre-release</pre></div>
+          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --update --pre-release</pre></div>
           <p style="font-size:13.5px;color:var(--muted)">うまくいかない場合は <a class="inline" href="https://github.com/microsoft/WSL/releases/tag/2.9.3" target="_blank" rel="noopener">GitHub Releases（2.9.3）</a> から手動インストールも可能です。</p>
         </li>
         <li>
           <div class="st-title">WSL を再起動して新ビルドを反映</div>
           <p><b>このステップが現セッションを終了させます。</b> Windows ターミナルから実行し、その後 WSL を開き直してください。</p>
-          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --shutdown
+          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --shutdown
 <span class="cmt"># この後、WSL ターミナル／ディストロを開き直す</span></pre></div>
         </li>
         <li>
           <div class="st-title">反映を確認（2.9.3+ になっていること）</div>
-          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --version
+          <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wsl --version
 <span class="prompt">PS&gt; </span>wslc --help     <span class="cmt"># wslc が使えれば成功</span></pre></div>
         </li>
         <li>
           <div class="st-title">（任意）VS Code 連携</div>
           <p>Dev Containers 拡張を <strong>0.462.0-pre-release 以降</strong>に更新し、設定の <strong>"Docker Path"</strong> を <code>wslc</code> に変更します。JSON のキーは <code>dev.containers.dockerPath</code>（<b>ユーザー設定＝application スコープ</b>。ワークスペース設定では不可）。</p>
-          <div class="codeblock"><span class="label">settings.json（User）</span><button class="copybtn">コピー</button><pre>{
+          <div class="codeblock"><span class="label">settings.json（User）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre>{
   <span style="color:#7dd3fc">"dev.containers.dockerPath"</span>: <span style="color:#86efac">"wslc"</span>
 }</pre></div>
         </li>
@@ -395,14 +434,14 @@
 
       <h3>公式ブログ掲載の例 <span class="conf official">公式</span></h3>
       <p>デスクトップ環境をバックグラウンド起動（ポート公開）:</p>
-      <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wslc run -d --name=webtop -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC -p 3000:3000 -p 3001:3001 lscr.io/linuxserver/webtop:ubuntu-kde</pre></div>
+      <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wslc run -d --name=webtop -e PUID=1000 -e PGID=1000 -e TZ=Etc/UTC -p 3000:3000 -p 3001:3001 lscr.io/linuxserver/webtop:ubuntu-kde</pre></div>
 
       <p>GPU が使えるか確認（PyTorch + CUDA スクリプト）:</p>
-      <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wslc run --rm --gpus all pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime python -c <span style="color:#86efac">"import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"</span></pre></div>
+      <div class="codeblock win"><span class="label">PowerShell（Windows）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wslc run --rm --gpus all pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime python -c <span style="color:#86efac">"import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"</span></pre></div>
 
       <h3>参考：Docker 風の最小起動 <span class="conf bg">公式未掲載</span></h3>
       <p><code>wslc</code> は Docker 風コマンド体系のため、次のような最小起動も可能と考えられます。<strong>これは公式ブログには載っていない参考例</strong>で、実際の挙動・対応フラグは <code>wslc --help</code> 等で確認してください。</p>
-      <div class="codeblock win"><span class="label">PowerShell（Windows・参考）</span><button class="copybtn">コピー</button><pre><span class="prompt">PS&gt; </span>wslc run --rm -it ubuntu:latest bash</pre></div>
+      <div class="codeblock win"><span class="label">PowerShell（Windows・参考）</span><button type="button" class="copybtn" aria-label="コードをクリップボードにコピー">コピー</button><pre><span class="prompt">PS&gt; </span>wslc run --rm -it ubuntu:latest bash</pre></div>
 
       <div class="callout note"><span class="ic">💡</span><div>公式の例で確認できるフラグ: <code>-d</code>（バックグラウンド）・<code>--name</code>・<code>-e</code>（環境変数）・<code>-p</code>（ポート）・<code>--rm</code>・<code>--gpus</code>。Docker と同じ感覚で使えますが、<strong>完全な互換は公式に明言されていません</strong>。</div></div>
     </section>
@@ -424,6 +463,8 @@
 
   </main>
 </div>
+
+<button id="toTop" type="button" aria-label="ページ上部へ戻る" title="上部へ戻る">↑</button>
 
 <footer>
   <div class="src-card">
@@ -472,12 +513,21 @@
   var obs = new IntersectionObserver(function(entries){
     entries.forEach(function(en){
       if(en.isIntersecting){
-        links.forEach(function(l){ l.classList.remove('active'); });
-        var a = map[en.target.id]; if(a) a.classList.add('active');
+        links.forEach(function(l){ l.classList.remove('active'); l.removeAttribute('aria-current'); });
+        var a = map[en.target.id]; if(a){ a.classList.add('active'); a.setAttribute('aria-current','true'); }
       }
     });
   }, {rootMargin:'-20% 0px -70% 0px', threshold:0});
   Object.keys(map).forEach(function(id){ obs.observe(document.getElementById(id)); });
+
+  // Back-to-top button
+  var toTop = document.getElementById('toTop');
+  if(toTop){
+    var onScroll = function(){ toTop.classList.toggle('show', window.scrollY > 400); };
+    window.addEventListener('scroll', onScroll, {passive:true});
+    onScroll();
+    toTop.addEventListener('click', function(){ window.scrollTo({top:0, behavior:'smooth'}); });
+  }
 </script>
 </body>
 </html>
